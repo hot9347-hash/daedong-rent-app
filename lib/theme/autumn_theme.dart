@@ -41,7 +41,7 @@ class AutumnTheme {
           letterSpacing: -0.5,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: surfaceWarm,
         elevation: 1.5,
         shadowColor: primaryMaple.withOpacity(0.08),
