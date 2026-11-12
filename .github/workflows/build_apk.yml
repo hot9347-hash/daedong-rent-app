@@ -22,15 +22,20 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.x'
+          flutter-version: '3.22.x'
           channel: 'stable'
           cache: true
+
+      - name: Generate Android Scaffolding
+        run: |
+          flutter create --org com.daedong --project-name daedong_rent_app --platforms=android .
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.RECEIVE_SMS" />\n    <uses-permission android:name="android.permission.READ_SMS" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.CALL_PHONE" />' android/app/src/main/AndroidManifest.xml
 
       - name: Install dependencies
         run: flutter pub get
 
       - name: Build APK (Release)
-        run: flutter build apk --release
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
