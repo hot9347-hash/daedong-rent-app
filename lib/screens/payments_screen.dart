@@ -35,7 +35,6 @@ class _PaymentsScreenState extends State<PaymentsScreen> with SingleTickerProvid
     });
   }
 
-  // 빠른 수동 완납 처리
   Future<void> _markPaid(Payment p) async {
     final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     await DbHelper.instance.processIncomingPayment(
@@ -55,9 +54,84 @@ class _PaymentsScreenState extends State<PaymentsScreen> with SingleTickerProvid
     }
   }
 
+  Future<void> _showEditPaymentDialog(Payment p) async {
+    final paidCtrl = TextEditingController(text: p.amountPaid.toString());
+    final noteCtrl = TextEditingController(text: p.note);
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${p.roomNumber} (${p.tenantName}) 수납 수정'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('청구년월: ${p.yearMonth} (청구액: ${p.amountExpected}만원)'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: paidCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: '실제 입금액 (만원)',
+                suffixText: '만원',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: noteCtrl,
+              decoration: const InputDecoration(
+                labelText: '수납 메모',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                TextButton.icon(
+                  icon: const Icon(Icons.restore, size: 18, color: AutumnTheme.accentWine),
+                  label: const Text('미납(0원)으로 초기화', style: TextStyle(color: AutumnTheme.accentWine)),
+                  onPressed: () {
+                    paidCtrl.text = '0';
+                    noteCtrl.text = '미납 초기화';
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newPaid = int.tryParse(paidCtrl.text.trim()) ?? 0;
+              await DbHelper.instance.updatePaymentDirect(
+                paymentId: p.id!,
+                amountExpected: p.amountExpected,
+                amountPaid: newPaid,
+                note: noteCtrl.text.trim(),
+              );
+              if (context.mounted) Navigator.pop(ctx, true);
+            },
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+
+    if (saved == true) {
+      await _loadPayments();
+    }
+  }
+
   List<Payment> _getFilteredPayments(int tabIndex) {
     if (tabIndex == 0) return _payments;
-    final floorPrefix = '${tabIndex + 1}'; // 1 -> 2층 ('2')
+    final floorPrefix = '${tabIndex + 1}';
     return _payments.where((p) => p.roomNumber != null && p.roomNumber!.startsWith(floorPrefix)).toList();
   }
 
@@ -70,7 +144,6 @@ class _PaymentsScreenState extends State<PaymentsScreen> with SingleTickerProvid
           preferredSize: const Size.fromHeight(100),
           child: Column(
             children: [
-              // 월 선택 바
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
@@ -160,67 +233,85 @@ class _PaymentsScreenState extends State<PaymentsScreen> with SingleTickerProvid
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      p.roomNumber ?? '',
-                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AutumnTheme.textEspresso),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      p.tenantName ?? '(공실)',
-                      style: const TextStyle(fontSize: 14, color: AutumnTheme.textMuted),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: badgeColor,
-                    borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _showEditPaymentDialog(p),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        p.roomNumber ?? '',
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AutumnTheme.textEspresso),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        p.tenantName ?? '(공실)',
+                        style: const TextStyle(fontSize: 14, color: AutumnTheme.textMuted),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    statusText,
-                    style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('청구: ${p.amountExpected}만원 (매월 ${p.payDay}일)',
-                        style: const TextStyle(fontSize: 13, color: AutumnTheme.textMuted)),
-                    const SizedBox(height: 2),
-                    Text(
-                      '실 입금: ${p.amountPaid}만원' + (p.paidDate.isNotEmpty ? ' (${p.paidDate})' : ''),
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AutumnTheme.textEspresso),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: badgeColor,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  ],
-                ),
-                if (p.paymentStatus != '완납')
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      backgroundColor: AutumnTheme.primaryMaple,
+                    child: Text(
+                      statusText,
+                      style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13),
                     ),
-                    onPressed: () => _markPaid(p),
-                    child: const Text('완납 처리', style: TextStyle(fontSize: 12)),
                   ),
-              ],
-            ),
-          ],
+                ],
+              ),
+              const Divider(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('청구: ${p.amountExpected}만원 (매월 ${p.payDay}일)',
+                          style: const TextStyle(fontSize: 13, color: AutumnTheme.textMuted)),
+                      const SizedBox(height: 2),
+                      Text(
+                        '실 입금: ${p.amountPaid}만원' + (p.paidDate.isNotEmpty ? ' (${p.paidDate})' : ''),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AutumnTheme.textEspresso),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          foregroundColor: AutumnTheme.primaryMaple,
+                        ),
+                        onPressed: () => _showEditPaymentDialog(p),
+                        child: const Text('수정', style: TextStyle(fontSize: 12)),
+                      ),
+                      if (p.paymentStatus != '완납') ...[
+                        const SizedBox(width: 6),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            backgroundColor: AutumnTheme.primaryMaple,
+                          ),
+                          onPressed: () => _markPaid(p),
+                          child: const Text('완납 처리', style: TextStyle(fontSize: 12)),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

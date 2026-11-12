@@ -13,7 +13,7 @@ void main() async {
   // 데이터베이스 초기화 및 대동주택 16개 호실 시드 데이터 준비
   await DbHelper.instance.database;
 
-  // 안드로이드 SMS 감지 서비스 및 로컬 푸시 초기화
+  // 서비스 초기화
   await SmsService.instance.init();
 
   runApp(const DaedongRentApp());
@@ -25,7 +25,7 @@ class DaedongRentApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '대동주택 스마트 월세관리',
+      title: '대동노트',
       debugShowCheckedModeBanner: false,
       theme: AutumnTheme.theme,
       home: const MainNavigationScreen(),
@@ -43,20 +43,25 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    PaymentsScreen(),
-    RoomsScreen(),
-    SmsSimulationScreen(),
-  ];
+  Widget _buildActiveScreen() {
+    switch (_selectedIndex) {
+      case 0:
+        return DashboardScreen(key: ValueKey('dash_$_selectedIndex'));
+      case 1:
+        return PaymentsScreen(key: ValueKey('pay_$_selectedIndex'));
+      case 2:
+        return RoomsScreen(key: ValueKey('room_$_selectedIndex'));
+      case 3:
+        return SmsSimulationScreen(key: ValueKey('sms_$_selectedIndex'));
+      default:
+        return const DashboardScreen();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
+      body: _buildActiveScreen(),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),

@@ -148,6 +148,70 @@ class DbHelper {
     return res.map((e) => Room.fromMap(e)).toList();
   }
 
+  // --- 호실 정보 수정 (이름, 연락처, 보증금, 월세, 관리비, 납부일, 상태 등) ---
+  Future<void> updateRoom(Room room) async {
+    final db = await database;
+    await db.update(
+      'rooms',
+      room.toMap(),
+      where: 'id = ?',
+      whereArgs: [room.id],
+    );
+
+    final currentYm = DateFormat('yyyy-MM').format(DateTime.now());
+    if (room.status == '공실') {
+      // 공실로 변경된 경우 당월 미납 청구 내역이 있으면 제거
+      await db.delete(
+        'payments',
+        where: "room_id = ? AND year_month = ? AND payment_status = '미납'",
+        whereArgs: [room.id, currentYm],
+      );
+    } else {
+      // 계약중인 경우 당월 청구 예정액(월세+관리비) 동기화
+      final newExpected = room.totalExpected;
+      await syncMonthlyPayments(currentYm);
+      await db.rawUpdate('''
+        UPDATE payments
+        SET amount_expected = ?,
+            payment_status = CASE
+              WHEN amount_paid >= ? AND ? > 0 THEN '완납'
+              WHEN amount_paid > 0 THEN '부분입금'
+              ELSE '미납'
+            END
+        WHERE room_id = ? AND year_month = ?
+      ''', [newExpected, newExpected, newExpected, room.id, currentYm]);
+    }
+  }
+
+  // --- 수납 내역 직접 수정 (입금액, 상태 초기화 등) ---
+  Future<void> updatePaymentDirect({
+    required int paymentId,
+    required int amountExpected,
+    required int amountPaid,
+    required String note,
+  }) async {
+    final db = await database;
+    String status = '미납';
+    if (amountPaid >= amountExpected && amountExpected > 0) {
+      status = '완납';
+    } else if (amountPaid > 0) {
+      status = '부분입금';
+    }
+    final paidDate = amountPaid > 0 ? DateFormat('yyyy-MM-dd').format(DateTime.now()) : '';
+    await db.update(
+      'payments',
+      {
+        'amount_expected': amountExpected,
+        'amount_paid': amountPaid,
+        'payment_status': status,
+        'paid_date': paidDate,
+        'note': note,
+      },
+      where: 'id = ?',
+      whereArgs: [paymentId],
+    );
+  }
+
   // --- 특정 년월의 수납 현황 조회 (호실 정보 조인) ---
   Future<List<Payment>> getPaymentsForMonth(String yearMonth) async {
     final db = await database;
