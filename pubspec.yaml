@@ -1,7 +1,7 @@
-name: daedong_home
+name: daedong_note
 description: "대동하우스 입주 관리 노트"
 publish_to: 'none'
-version: 1.0.1+1
+version: 1.0.2+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -12,8 +12,6 @@ dependencies:
   sqflite: ^2.3.0
   path: ^1.8.3
   intl: ^0.19.0
-  flutter_local_notifications: ^17.0.0
-  url_launcher: ^6.2.4
 
 dev_dependencies:
   flutter_test:

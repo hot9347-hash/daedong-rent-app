@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../database/db_helper.dart';
 import '../models/payment.dart';
 import '../theme/autumn_theme.dart';
@@ -13,7 +13,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  String _currentYm = DateFormat('yyyy-MM').format(DateTime.now());
+  final String _currentYm = DateFormat('yyyy-MM').format(DateTime.now());
   List<Payment> _payments = [];
   bool _isLoading = true;
 
@@ -32,11 +32,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  Future<void> _makePhoneCall(String phoneNumber) async {
-    final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-    final uri = Uri.parse('tel:$cleanNumber');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+  Future<void> _copyPhoneNumber(String phoneNumber) async {
+    await Clipboard.setData(ClipboardData(text: phoneNumber));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('연락처 복사 완료: $phoneNumber'),
+          backgroundColor: AutumnTheme.primaryMaple,
+        ),
+      );
     }
   }
 
@@ -55,7 +59,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           mainAxisSize: MainAxisSize.min,
           children: const [
             Text('🍁 ', style: TextStyle(fontSize: 20)),
-            Text('대동주택 월세 관리'),
+            Text('대동하우스 노트'),
           ],
         ),
         actions: [
@@ -73,7 +77,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  // 상단 가을 인사 배너
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
@@ -97,9 +100,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
+                            const Text(
                               '대동주택 (201호~504호 / 총 16세대)',
-                              style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                              style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -135,7 +138,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   const SizedBox(height: 24),
 
-                  // 미납 및 연체 알림 섹션
                   Row(
                     children: [
                       const Icon(Icons.warning_amber_rounded, color: AutumnTheme.accentWine, size: 22),
@@ -170,43 +172,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     )
                   else
                     ...unpaidList.map((p) => _buildUnpaidCard(p)),
-
-                  const SizedBox(height: 24),
-
-                  // 자동 입금 감지 배너 안내
-                  Card(
-                    color: const Color(0xFFF4EDE4),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AutumnTheme.secondaryAmber.withOpacity(0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.sms_outlined, color: AutumnTheme.secondaryAmber),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text('스마트 입금 감지 가동 중',
-                                    style: TextStyle(fontWeight: FontWeight.bold, color: AutumnTheme.textEspresso)),
-                                SizedBox(height: 4),
-                                Text(
-                                  '은행 입금 문자가 오면 자동으로 2달치 선납까지 폰 안에서 계산하여 즉시 장부에 기록합니다.',
-                                  style: TextStyle(fontSize: 12, color: AutumnTheme.textMuted),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -272,9 +237,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             if (p.tenantPhone != null && p.tenantPhone!.isNotEmpty)
               IconButton(
-                icon: const Icon(Icons.phone_in_talk, color: AutumnTheme.primaryMaple),
-                onPressed: () => _makePhoneCall(p.tenantPhone!),
-                tooltip: '세입자에게 전화걸기',
+                icon: const Icon(Icons.copy, color: AutumnTheme.primaryMaple),
+                onPressed: () => _copyPhoneNumber(p.tenantPhone!),
+                tooltip: '연락처 복사',
               ),
           ],
         ),

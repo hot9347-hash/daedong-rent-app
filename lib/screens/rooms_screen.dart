@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
 import '../database/db_helper.dart';
 import '../models/room.dart';
 import '../theme/autumn_theme.dart';
@@ -30,11 +30,15 @@ class _RoomsScreenState extends State<RoomsScreen> {
     });
   }
 
-  Future<void> _makePhoneCall(String phoneNumber) async {
-    final clean = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-    final uri = Uri.parse('tel:$clean');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+  Future<void> _copyPhoneNumber(String phoneNumber) async {
+    await Clipboard.setData(ClipboardData(text: phoneNumber));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('연락처 복사 완료: $phoneNumber'),
+          backgroundColor: AutumnTheme.primaryMaple,
+        ),
+      );
     }
   }
 
@@ -110,9 +114,9 @@ class _RoomsScreenState extends State<RoomsScreen> {
                     trailing: isVacant
                         ? null
                         : IconButton(
-                            icon: const Icon(Icons.call, color: AutumnTheme.primaryMaple),
-                            onPressed: () => _makePhoneCall(r.tenantPhone),
-                            tooltip: '전화 걸기',
+                            icon: const Icon(Icons.copy, color: AutumnTheme.primaryMaple),
+                            onPressed: () => _copyPhoneNumber(r.tenantPhone),
+                            tooltip: '연락처 복사',
                           ),
                   ),
                 );

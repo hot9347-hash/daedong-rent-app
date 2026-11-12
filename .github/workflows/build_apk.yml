@@ -19,64 +19,88 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Flutter
+      - name: Set up Flutter (Latest Stable)
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x'
           channel: 'stable'
           cache: true
 
-      - name: Generate Fresh Scaffolding with New Clean Package ID
+      - name: Generate Zero-Permission Latest Android Scaffolding
         run: |
-          # 블랙리스트 캐시를 피하기 위해 완전히 새로운 클린 패키지 ID로 생성
-          flutter create --org com.hotve --project-name daedong_home --platforms=android .
-          echo "flutter.minSdkVersion=23" >> android/local.properties
-          find android/app -name "build.gradle*" -exec sed -i 's/minSdk.*/minSdkVersion = 23/g' {} +
-          find android/app -name "build.gradle*" -exec sed -i 's/minSdkVersion.*/minSdkVersion = 23/g' {} +
+          rm -rf android
+          flutter create --org com.personal --project-name daedong_note --platforms=android .
           
-          # 앱 라벨을 일반적인 '대동하우스'로 설정 (피싱 키워드 배제)
-          sed -i 's/android:label=".*"/android:label="대동하우스"/g' android/app/src/main/AndroidManifest.xml
+          # 모든 uses-permission 완전 제거 (인터넷, 알림, 전화, SMS 등 권한 0개)
+          sed -i '/<uses-permission/d' android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:label=".*"/android:label="대동노트"/g' android/app/src/main/AndroidManifest.xml
 
-          # 새로운 정식 Keystore 키 파일 생성
-          keytool -genkeypair -v -keystore android/app/clean_release.jks -alias daedonghome -keyalg RSA -keysize 2048 -validity 10000 -storepass 987654 -keypass 987654 -dname "CN=Daedong Home, OU=Mobile, O=Personal, L=Seoul, C=KR"
+          # 새로운 정식 Keystore 생성
+          keytool -genkeypair -v -keystore android/app/note_release.jks -alias daedongnote -keyalg RSA -keysize 2048 -validity 10000 -storepass 135790 -keypass 135790 -dname "CN=Personal Note, OU=App, O=Note, L=Seoul, C=KR"
 
-          # Gradle에 정식 릴리즈 서명 설정 주입
-          cat << 'EOF' > patch_signing.py
+          # Gradle 서명 설정 (build.gradle 또는 build.gradle.kts 모두 대응)
+          if [ -f "android/app/build.gradle" ]; then
+            cat << 'EOF' > patch_signing.py
           with open("android/app/build.gradle", "r") as f:
               content = f.read()
-
           signing_block = """
               signingConfigs {
                   release {
-                      storeFile file('clean_release.jks')
-                      storePassword '987654'
-                      keyAlias 'daedonghome'
-                      keyPassword '987654'
+                      storeFile file('note_release.jks')
+                      storePassword '135790'
+                      keyAlias 'daedongnote'
+                      keyPassword '135790'
                   }
               }
           """
           content = content.replace("android {", "android {" + signing_block, 1)
           content = content.replace("signingConfig = signingConfigs.debug", "signingConfig = signingConfigs.release")
           content = content.replace("signingConfig signingConfigs.debug", "signingConfig signingConfigs.release")
-
           with open("android/app/build.gradle", "w") as f:
               f.write(content)
           EOF
-          python3 patch_signing.py
+            python3 patch_signing.py
+          elif [ -f "android/app/build.gradle.kts" ]; then
+            cat << 'EOF' > patch_signing_kts.py
+          with open("android/app/build.gradle.kts", "r") as f:
+              content = f.read()
+          signing_block = """
+              signingConfigs {
+                  create("release") {
+                      storeFile = file("note_release.jks")
+                      storePassword = "135790"
+                      keyAlias = "daedongnote"
+                      keyPassword = "135790"
+                  }
+              }
+          """
+          content = content.replace("android {", "android {" + signing_block, 1)
+          content = content.replace('signingConfigs.getByName("debug")', 'signingConfigs.getByName("release")')
+          with open("android/app/build.gradle.kts", "w") as f:
+              f.write(content)
+          EOF
+            python3 patch_signing_kts.py
+          fi
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build Signed APK
+      - name: Build Signed APK (Latest Android SDK Target)
         run: flutter build apk --release --no-tree-shake-icons
 
-      - name: Verify APK Signature
+      - name: Inspect APK Permissions & Signature
         run: |
-          $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose build/app/outputs/flutter-apk/app-release.apk
+          AAPT=$(find $ANDROID_HOME/build-tools -name "aapt" | sort -V | tail -n 1)
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name "apksigner" | sort -V | tail -n 1)
+          echo "=== APK Permissions ==="
+          $AAPT dump permissions build/app/outputs/flutter-apk/app-release.apk
+          echo "=== APK Badging (SDK Versions) ==="
+          $AAPT dump badging build/app/outputs/flutter-apk/app-release.apk | head -n 5
+          echo "=== APK Signature ==="
+          $APKSIGNER verify --verbose build/app/outputs/flutter-apk/app-release.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: daedong_home_clean_apk
+          name: daedong_note_zero_perm_apk
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30

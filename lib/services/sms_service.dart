@@ -1,39 +1,15 @@
 import 'dart:async';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
 import '../database/db_helper.dart';
 import '../models/room.dart';
 
 class SmsService {
   static final SmsService instance = SmsService._init();
-  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
 
   SmsService._init();
 
-  // 초기화 및 로컬 푸시 알림 등록
   Future<void> init() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidSettings);
-    await _notifications.initialize(initSettings);
-  }
-
-  // 상단 푸시 알림 표시
-  Future<void> _showNotification(String title, String body) async {
-    const androidDetails = AndroidNotificationDetails(
-      'rent_payment_channel',
-      '월세 입금 알림',
-      channelDescription: '대동주택 입금 자동 감지 및 완납/선납 알림',
-      importance: Importance.max,
-      priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
-    );
-    const notificationDetails = NotificationDetails(android: androidDetails);
-    await _notifications.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title,
-      body,
-      notificationDetails,
-    );
+    // 무권한 클린 모드 초기화
   }
 
   // --- 핵심: 입금 문자/알림 분석 및 대동주택 호실 자동 매칭 ---
@@ -49,7 +25,6 @@ class SmsService {
       final raw = int.tryParse(match.group(1)!.replaceAll(',', '')) ?? 0;
       amountManwon = raw ~/ 10000;
     } else {
-      // '100만원' 형태 검사
       final manwonRegex = RegExp(r'([0-9]+)\s*만\s*원?');
       final manMatch = manwonRegex.firstMatch(smsText);
       if (manMatch != null) {
@@ -71,12 +46,10 @@ class SmsService {
       final roomNo = r.roomNumber.trim();
       final roomDigits = roomNo.replaceAll(RegExp(r'[^0-9]'), '');
 
-      // 1순위: 세입자 이름이 문자에 포함된 경우
       if (name.isNotEmpty && name.length >= 2 && smsText.contains(name)) {
         matchedRoom = r;
         break;
       }
-      // 2순위: 호수가 문자에 포함된 경우
       if (roomNo.isNotEmpty && smsText.contains(roomNo)) {
         matchedRoom = r;
         break;
@@ -107,12 +80,6 @@ class SmsService {
         '${matchedRoom.roomNumber} (${matchedRoom.tenantName})',
         amountManwon,
         '성공: $details',
-      );
-
-      // 상단 팝업 알림 띄우기
-      await _showNotification(
-        '🍂 [대동주택 ${matchedRoom.roomNumber}] ${amountManwon}만원 입금 완료',
-        details,
       );
     }
 
