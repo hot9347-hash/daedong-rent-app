@@ -26,9 +26,13 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Generate Android Scaffolding
+      - name: Generate Android Scaffolding & Configure SDK
         run: |
           flutter create --org com.daedong --project-name daedong_rent_app --platforms=android .
+          # telephony 플러그인 요구사항: minSdkVersion 23 설정
+          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 23/g' android/app/build.gradle
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
+          # 안드로이드 SMS 및 알림 권한 추가
           sed -i '/<application/i \    <uses-permission android:name="android.permission.RECEIVE_SMS" />\n    <uses-permission android:name="android.permission.READ_SMS" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.CALL_PHONE" />' android/app/src/main/AndroidManifest.xml
 
       - name: Install dependencies
