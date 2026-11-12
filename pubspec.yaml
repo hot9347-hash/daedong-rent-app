@@ -1,0 +1,25 @@
+name: daedong_rent_app
+description: "대동주택 스마트 월세 관리 앱 (입금 문자 자동 감지 및 2달치 선납 자동 처리)"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  intl: ^0.19.0
+  telephony: ^0.2.0
+  flutter_local_notifications: ^17.0.0
+  url_launcher: ^6.2.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
