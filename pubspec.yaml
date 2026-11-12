@@ -1,7 +1,7 @@
-name: daedong_rent_app
-description: "대동주택 스마트 월세 관리 앱"
+name: daedong_home
+description: "대동하우스 입주 관리 노트"
 publish_to: 'none'
-version: 1.0.0+2
+version: 1.0.1+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

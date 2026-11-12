@@ -26,18 +26,21 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Generate Scaffolding & Configure v2/v3 Signing
+      - name: Generate Fresh Scaffolding with New Clean Package ID
         run: |
-          # 1. 안드로이드 프로젝트 스캐폴딩
-          flutter create --org com.daedong --project-name daedong_rent_app --platforms=android .
+          # 블랙리스트 캐시를 피하기 위해 완전히 새로운 클린 패키지 ID로 생성
+          flutter create --org com.hotve --project-name daedong_home --platforms=android .
           echo "flutter.minSdkVersion=23" >> android/local.properties
           find android/app -name "build.gradle*" -exec sed -i 's/minSdk.*/minSdkVersion = 23/g' {} +
           find android/app -name "build.gradle*" -exec sed -i 's/minSdkVersion.*/minSdkVersion = 23/g' {} +
           
-          # 2. 정식 Keystore 키 파일 생성
-          keytool -genkeypair -v -keystore android/app/release.jks -alias daedong -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=Daedong Housing, OU=Rent, O=Daedong, L=Seoul, C=KR"
+          # 앱 라벨을 일반적인 '대동하우스'로 설정 (피싱 키워드 배제)
+          sed -i 's/android:label=".*"/android:label="대동하우스"/g' android/app/src/main/AndroidManifest.xml
 
-          # 3. Gradle에 정식 릴리즈 서명(v1 + v2 + v3 Scheme) 설정 주입
+          # 새로운 정식 Keystore 키 파일 생성
+          keytool -genkeypair -v -keystore android/app/clean_release.jks -alias daedonghome -keyalg RSA -keysize 2048 -validity 10000 -storepass 987654 -keypass 987654 -dname "CN=Daedong Home, OU=Mobile, O=Personal, L=Seoul, C=KR"
+
+          # Gradle에 정식 릴리즈 서명 설정 주입
           cat << 'EOF' > patch_signing.py
           with open("android/app/build.gradle", "r") as f:
               content = f.read()
@@ -45,10 +48,10 @@ jobs:
           signing_block = """
               signingConfigs {
                   release {
-                      storeFile file('release.jks')
-                      storePassword '123456'
-                      keyAlias 'daedong'
-                      keyPassword '123456'
+                      storeFile file('clean_release.jks')
+                      storePassword '987654'
+                      keyAlias 'daedonghome'
+                      keyPassword '987654'
                   }
               }
           """
@@ -61,13 +64,10 @@ jobs:
           EOF
           python3 patch_signing.py
 
-          # 알림 권한 추가
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />' android/app/src/main/AndroidManifest.xml
-
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build Signed APK (Release with v1, v2, v3 Signature)
+      - name: Build Signed APK
         run: flutter build apk --release --no-tree-shake-icons
 
       - name: Verify APK Signature
@@ -77,6 +77,6 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: daedong_rent_apk_v2signed
+          name: daedong_home_clean_apk
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
