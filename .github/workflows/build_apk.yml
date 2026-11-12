@@ -26,31 +26,57 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Generate Android Scaffolding & Configure Safe App
+      - name: Generate Scaffolding & Configure v2/v3 Signing
         run: |
+          # 1. 안드로이드 프로젝트 스캐폴딩
           flutter create --org com.daedong --project-name daedong_rent_app --platforms=android .
           echo "flutter.minSdkVersion=23" >> android/local.properties
           find android/app -name "build.gradle*" -exec sed -i 's/minSdk.*/minSdkVersion = 23/g' {} +
           find android/app -name "build.gradle*" -exec sed -i 's/minSdkVersion.*/minSdkVersion = 23/g' {} +
-          # 안전한 기본 권한(알림 전송만 유지, 위험 권한인 RECEIVE_SMS, READ_SMS 전면 배제)
+          
+          # 2. 정식 Keystore 키 파일 생성
+          keytool -genkeypair -v -keystore android/app/release.jks -alias daedong -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=Daedong Housing, OU=Rent, O=Daedong, L=Seoul, C=KR"
+
+          # 3. Gradle에 정식 릴리즈 서명(v1 + v2 + v3 Scheme) 설정 주입
+          cat << 'EOF' > patch_signing.py
+          with open("android/app/build.gradle", "r") as f:
+              content = f.read()
+
+          signing_block = """
+              signingConfigs {
+                  release {
+                      storeFile file('release.jks')
+                      storePassword '123456'
+                      keyAlias 'daedong'
+                      keyPassword '123456'
+                  }
+              }
+          """
+          content = content.replace("android {", "android {" + signing_block, 1)
+          content = content.replace("signingConfig = signingConfigs.debug", "signingConfig = signingConfigs.release")
+          content = content.replace("signingConfig signingConfigs.debug", "signingConfig signingConfigs.release")
+
+          with open("android/app/build.gradle", "w") as f:
+              f.write(content)
+          EOF
+          python3 patch_signing.py
+
+          # 알림 권한 추가
           sed -i '/<application/i \    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />' android/app/src/main/AndroidManifest.xml
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build APK (Release)
+      - name: Build Signed APK (Release with v1, v2, v3 Signature)
         run: flutter build apk --release --no-tree-shake-icons
 
-      - name: Create Keystore & Sign APK
+      - name: Verify APK Signature
         run: |
-          # 신뢰할 수 있는 개발자 서명 생성
-          keytool -genkeypair -v -keystore release.jks -alias daedong -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=Daedong Housing, OU=Rent, O=Daedong, L=Seoul, C=KR"
-          # APK 정식 서명 적용
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore release.jks -storepass 123456 -keypass 123456 build/app/outputs/flutter-apk/app-release.apk daedong
+          $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose build/app/outputs/flutter-apk/app-release.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: daedong_rent_apk_safe
+          name: daedong_rent_apk_v2signed
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
