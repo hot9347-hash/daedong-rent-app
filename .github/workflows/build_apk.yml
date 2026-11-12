@@ -29,9 +29,11 @@ jobs:
       - name: Generate Android Scaffolding & Configure SDK
         run: |
           flutter create --org com.daedong --project-name daedong_rent_app --platforms=android .
-          # telephony 플러그인 요구사항: minSdkVersion 23 설정
-          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 23/g' android/app/build.gradle
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
+          # local.properties에 minSdkVersion 23 명시
+          echo "flutter.minSdkVersion=23" >> android/local.properties
+          # build.gradle 파일 내 모든 minSdk 정의를 23으로 강제 치환
+          find android/app -name "build.gradle*" -exec sed -i 's/minSdk.*/minSdkVersion = 23/g' {} +
+          find android/app -name "build.gradle*" -exec sed -i 's/minSdkVersion.*/minSdkVersion = 23/g' {} +
           # 안드로이드 SMS 및 알림 권한 추가
           sed -i '/<application/i \    <uses-permission android:name="android.permission.RECEIVE_SMS" />\n    <uses-permission android:name="android.permission.READ_SMS" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.CALL_PHONE" />' android/app/src/main/AndroidManifest.xml
 
