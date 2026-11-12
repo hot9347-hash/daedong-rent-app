@@ -26,16 +26,14 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Generate Android Scaffolding & Configure SDK
+      - name: Generate Android Scaffolding & Configure Safe App
         run: |
           flutter create --org com.daedong --project-name daedong_rent_app --platforms=android .
-          # local.properties에 minSdkVersion 23 명시
           echo "flutter.minSdkVersion=23" >> android/local.properties
-          # build.gradle 파일 내 모든 minSdk 정의를 23으로 강제 치환
           find android/app -name "build.gradle*" -exec sed -i 's/minSdk.*/minSdkVersion = 23/g' {} +
           find android/app -name "build.gradle*" -exec sed -i 's/minSdkVersion.*/minSdkVersion = 23/g' {} +
-          # 안드로이드 SMS 및 알림 권한 추가
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.RECEIVE_SMS" />\n    <uses-permission android:name="android.permission.READ_SMS" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.CALL_PHONE" />' android/app/src/main/AndroidManifest.xml
+          # 안전한 기본 권한(알림 전송만 유지, 위험 권한인 RECEIVE_SMS, READ_SMS 전면 배제)
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />' android/app/src/main/AndroidManifest.xml
 
       - name: Install dependencies
         run: flutter pub get
@@ -43,9 +41,16 @@ jobs:
       - name: Build APK (Release)
         run: flutter build apk --release --no-tree-shake-icons
 
+      - name: Create Keystore & Sign APK
+        run: |
+          # 신뢰할 수 있는 개발자 서명 생성
+          keytool -genkeypair -v -keystore release.jks -alias daedong -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=Daedong Housing, OU=Rent, O=Daedong, L=Seoul, C=KR"
+          # APK 정식 서명 적용
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore release.jks -storepass 123456 -keypass 123456 build/app/outputs/flutter-apk/app-release.apk daedong
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: daedong_rent_apk
+          name: daedong_rent_apk_safe
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30

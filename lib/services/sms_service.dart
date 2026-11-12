@@ -1,46 +1,20 @@
 import 'dart:async';
-import 'package:telephony/telephony.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
 import '../database/db_helper.dart';
 import '../models/room.dart';
 
-// 백그라운드에서 SMS가 도착했을 때 안드로이드 OS가 호출하는 최상위 핸들러
-@pragma('vm:entry-point')
-void backGroundMessageHandler(SmsMessage message) async {
-  final text = message.body ?? '';
-  if (text.contains('입금')) {
-    await SmsService.instance.processRawSms(text);
-  }
-}
-
 class SmsService {
   static final SmsService instance = SmsService._init();
-  final Telephony _telephony = Telephony.instance;
   final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
 
   SmsService._init();
 
-  // 초기화 및 안드로이드 권한/리스너 등록
+  // 초기화 및 로컬 푸시 알림 등록
   Future<void> init() async {
-    // 1. 로컬 푸시 알림 초기화
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidSettings);
     await _notifications.initialize(initSettings);
-
-    // 2. 안드로이드 SMS 권한 확인 및 리스너 등록
-    final bool? permissionsGranted = await _telephony.requestPhoneAndSmsPermissions;
-    if (permissionsGranted == true) {
-      _telephony.listenIncomingSms(
-        onNewMessage: (SmsMessage message) async {
-          final text = message.body ?? '';
-          if (text.contains('입금')) {
-            await processRawSms(text);
-          }
-        },
-        onBackgroundMessage: backGroundMessageHandler,
-      );
-    }
   }
 
   // 상단 푸시 알림 표시
@@ -48,7 +22,7 @@ class SmsService {
     const androidDetails = AndroidNotificationDetails(
       'rent_payment_channel',
       '월세 입금 알림',
-      channelDescription: '대동주택 입금 문자 자동 감지 및 완납/선납 알림',
+      channelDescription: '대동주택 입금 자동 감지 및 완납/선납 알림',
       importance: Importance.max,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
@@ -62,7 +36,7 @@ class SmsService {
     );
   }
 
-  // --- 핵심: 입금 문자 분석 및 대동주택 호실 자동 매칭 ---
+  // --- 핵심: 입금 문자/알림 분석 및 대동주택 호실 자동 매칭 ---
   Future<Map<String, dynamic>> processRawSms(String smsText) async {
     final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
@@ -97,12 +71,12 @@ class SmsService {
       final roomNo = r.roomNumber.trim();
       final roomDigits = roomNo.replaceAll(RegExp(r'[^0-9]'), '');
 
-      // 1순위: 세입자 이름이 문자에 포함된 경우 (예: "김민수")
+      // 1순위: 세입자 이름이 문자에 포함된 경우
       if (name.isNotEmpty && name.length >= 2 && smsText.contains(name)) {
         matchedRoom = r;
         break;
       }
-      // 2순위: 호수가 문자에 포함된 경우 (예: "201호", "201")
+      // 2순위: 호수가 문자에 포함된 경우
       if (roomNo.isNotEmpty && smsText.contains(roomNo)) {
         matchedRoom = r;
         break;
@@ -123,7 +97,7 @@ class SmsService {
       roomId: matchedRoom.id!,
       totalAmount: amountManwon,
       paidDate: todayStr,
-      note: 'SMS 자동 입금',
+      note: '자동 입금 반영',
     );
 
     if (result['success'] == true) {
