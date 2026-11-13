@@ -58,8 +58,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: const [
-            Text('🍁 ', style: TextStyle(fontSize: 20)),
-            Text('대동하우스 노트'),
+            Text('🍁 ', style: TextStyle(fontSize: 22)),
+            Text(
+              '대동주택',
+              style: TextStyle(
+                fontFamily: 'Jua',
+                fontSize: 24,
+                fontWeight: FontWeight.w400,
+                letterSpacing: 0.5,
+                color: AutumnTheme.textEspresso,
+              ),
+            ),
           ],
         ),
         actions: [

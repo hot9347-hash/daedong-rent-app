@@ -15,6 +15,7 @@ class AutumnTheme {
   static ThemeData get theme {
     return ThemeData(
       useMaterial3: true,
+      fontFamily: 'GowunDodum',
       colorScheme: ColorScheme(
         brightness: Brightness.light,
         primary: primaryMaple,
